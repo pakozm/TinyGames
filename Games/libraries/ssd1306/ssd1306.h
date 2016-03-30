@@ -26,5 +26,6 @@ void ssd1306_char_f6x8(uint8_t x, uint8_t y, const char ch[]);
 //void ssd1306_char_f8x16(uint8_t x, uint8_t y,const char ch[]);
 //void ssd1306_char_f16x16(uint8_t x, uint8_t y, uint8_t N);
 void ssd1306_draw_bmp(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint8_t bitmap[]);
+void ssd1306_clearscreen();
 // ----------------------------------------------------------------------------
 #endif // SSD1306XLED_H
