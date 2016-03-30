@@ -10,9 +10,16 @@
  * 
  * Sleep code is based on this blog post by Matthew Little:
  * http://www.re-innovation.co.uk/web12/index.php/en/blog-75/306-sleep-modes-on-attiny85
-*/
+ */
+/* 2016
+ *
+ * Updated by pakozm (Paco Zamora Martinez):
+ *
+ *   - code refactoring
+ */
 #include <EEPROM.h>
-#include "font6x8.h"
+#include <font6x8.h>
+#include <ssd1306.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h> // needed for the additional interrupt
 
@@ -37,12 +44,12 @@ byte flameMask[2]={B00111111,B11111111}; // this is used to only show the flame 
 
 int score = 0; // score - this affects the difficulty of the game
 ISR(PCINT0_vect){ // PB0 pin button interrupt			     
-   //if (playerOffset >1&&stopAnimate==0){playerOffset-=1;} // for debounce, the movement is in the main loop//
-   return;
+  //if (playerOffset >1&&stopAnimate==0){playerOffset-=1;} // for debounce, the movement is in the main loop//
+  return;
 }
 void playerInc(){ // PB2 pin button interrupt
-   fire = 1;
-   fireCount = 5; // number of frames the shot will persist
+  fire = 1;
+  fireCount = 5; // number of frames the shot will persist
 }
 
 void setup() {
@@ -54,283 +61,283 @@ void setup() {
   attachInterrupt(0,playerInc,RISING);
 }
 void loop() { 
-      delay(40);
-      noInterrupts();
-      ssd1306_init();
-      ssd1306_fillscreen(0x00);
-      ssd1306_char_f6x8(16, 4, "U F O  E S C A P E");
-      ssd1306_char_f6x8(20, 6, "webboggles.com");
-      beep(200,600);          beep(300,200);          beep(400,300);
+  delay(40);
+  noInterrupts();
+  ssd1306_init();
+  ssd1306_fillscreen(0x00);
+  ssd1306_char_f6x8(16, 4, "U F O  E S C A P E");
+  ssd1306_char_f6x8(20, 6, "webboggles.com");
+  beep(200,600);          beep(300,200);          beep(400,300);
       
-      delay(2000);
+  delay(2000);
 
-	while (1==1) {
+  while (1==1) {
 
-              //update game vars to make it harder to play
-              if (score < 500){blockChance = 11-score/50;  maxObstacles=score/70+1;}
-              if (score > 130){obstacleStep = 2;}
-              if (score < 2000){maxGap = 60-score/100;}
-              if (fire == 1){score--;}
-              if (fireCount>0){fireCount--;}
+    //update game vars to make it harder to play
+    if (score < 500){blockChance = 11-score/50;  maxObstacles=score/70+1;}
+    if (score > 130){obstacleStep = 2;}
+    if (score < 2000){maxGap = 60-score/100;}
+    if (fire == 1){score--;}
+    if (fireCount>0){fireCount--;}
               
-                if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
-                  for (int i = 0; i<2; i++){
-                    beep(1,random(0,i*2));
-                  }
-                }} 
-                if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
-                  for (int i = 0; i<2; i++){
-                    beep(1,random(0,i*2));
-                  }
-                }}
-                if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
-                  for (int i = 0; i<2; i++){
-                    beep(1,random(0,i*2));
-                  }
-                }}
-                stepsSinceLastObstacle += obstacleStep;
-                for (byte i = 0; i<maxObstacles;i++){ // fly obstacles
-                  if (obstacle[i] >= 0 && obstacle[i] <= 128 && stopAnimate==0){
-                    obstacle[i] -= obstacleStep;
-                    if (gapBlock[i]>0 && obstacle[i] < 36  && playerOffset>gapOffset[i] && playerOffset+5<gapOffset[i]+gapSize[i] && fireCount > 0){//
-                       gapBlock[i] = 0;
-                       score += 5; 
-                       for (byte cp = 400; cp>0; cp--){
-                         beep(1,cp);
-                       }
-                    }
-                  } 
+    if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
+        for (int i = 0; i<2; i++){
+          beep(1,random(0,i*2));
+        }
+      }} 
+    if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
+        for (int i = 0; i<2; i++){
+          beep(1,random(0,i*2));
+        }
+      }}
+    if (digitalRead(0)==1){if (playerOffset >0 && stopAnimate==0){playerOffset--; flames = 1; // move player up
+        for (int i = 0; i<2; i++){
+          beep(1,random(0,i*2));
+        }
+      }}
+    stepsSinceLastObstacle += obstacleStep;
+    for (byte i = 0; i<maxObstacles;i++){ // fly obstacles
+      if (obstacle[i] >= 0 && obstacle[i] <= 128 && stopAnimate==0){
+        obstacle[i] -= obstacleStep;
+        if (gapBlock[i]>0 && obstacle[i] < 36  && playerOffset>gapOffset[i] && playerOffset+5<gapOffset[i]+gapSize[i] && fireCount > 0){//
+          gapBlock[i] = 0;
+          score += 5; 
+          for (byte cp = 400; cp>0; cp--){
+            beep(1,cp);
+          }
+        }
+      } 
                   
-                  if (obstacle[i]<=4 && stepsSinceLastObstacle>=random(30,100)){ // generate new obstacles
-                    obstacle[i] = 123;
-                    gapSize[i] = random(25,maxGap);
-                    gapOffset[i] = random(0,64-gapSize[i]);
-                    if (random(0,blockChance)==0){gapBlock[i] = 1;}else {gapBlock[i] = 0;}
-                    stepsSinceLastObstacle = 0;
-                    score+=1;
-                  }
-                }
+      if (obstacle[i]<=4 && stepsSinceLastObstacle>=random(30,100)){ // generate new obstacles
+        obstacle[i] = 123;
+        gapSize[i] = random(25,maxGap);
+        gapOffset[i] = random(0,64-gapSize[i]);
+        if (random(0,blockChance)==0){gapBlock[i] = 1;}else {gapBlock[i] = 0;}
+        stepsSinceLastObstacle = 0;
+        score+=1;
+      }
+    }
                 
-                if (playerOffset < 56 && stopAnimate==0){playerOffset++;} // player gravity
+    if (playerOffset < 56 && stopAnimate==0){playerOffset++;} // player gravity
                 
-                delay(20/maxObstacles); // controls game speed, more obstacles take longer to be sent to the screen
-                if (stopAnimate==0){ssd1306_clearscreen();}
+    delay(20/maxObstacles); // controls game speed, more obstacles take longer to be sent to the screen
+    if (stopAnimate==0){ssd1306_clearscreen();}
               
 
-              // update whats on the screen
+    // update whats on the screen
                  
-                  noInterrupts();
-                  // Send Obstacle
-                  for (byte i = 0; i<maxObstacles;i++){
-                    if (obstacle[i] >= -5 && obstacle[i] <= 128){ // only deal with visible obstacles
-                      if (obstacle[i] > 8 && obstacle[i] <16){ // look for collision if obstacle is near the player
-                        if (playerOffset < gapOffset[i] || playerOffset+5 > gapOffset[i]+gapSize[i] || gapBlock[i] != 0){
-                          // collision!
-                          stopAnimate = 1; 
-                          int topScore = EEPROM.read(0);
-                          topScore = topScore << 8;
-                          topScore = topScore |  EEPROM.read(1);
-                          if (score>topScore){topScore = score; EEPROM.write(1,topScore & 0xFF); EEPROM.write(0,(topScore>>8) & 0xFF); }
+    noInterrupts();
+    // Send Obstacle
+    for (byte i = 0; i<maxObstacles;i++){
+      if (obstacle[i] >= -5 && obstacle[i] <= 128){ // only deal with visible obstacles
+        if (obstacle[i] > 8 && obstacle[i] <16){ // look for collision if obstacle is near the player
+          if (playerOffset < gapOffset[i] || playerOffset+5 > gapOffset[i]+gapSize[i] || gapBlock[i] != 0){
+            // collision!
+            stopAnimate = 1; 
+            int topScore = EEPROM.read(0);
+            topScore = topScore << 8;
+            topScore = topScore |  EEPROM.read(1);
+            if (score>topScore){topScore = score; EEPROM.write(1,topScore & 0xFF); EEPROM.write(0,(topScore>>8) & 0xFF); }
 
-                          ssd1306_char_f6x8(32, 3, "Game Over");
-                          ssd1306_char_f6x8(32, 5, "score:");
-                          char temp[10] = {0,0,0,0,0,0,0,0,0,0};
-                          itoa(score,temp,10);
-                          ssd1306_char_f6x8(70, 5, temp);
-                          ssd1306_char_f6x8(32, 6, "top score:");
-                          itoa(topScore,temp,10);
-                          ssd1306_char_f6x8(90, 6, temp);
-                          for (int i = 0; i<1000; i++){
-                            beep(1,random(0,i*2));
-                          }
-                          delay(2000);
-                          interrupts();
-                          system_sleep();
-                          resetGame();
-                          noInterrupts(); 
-                        }
-                      }                      
+            ssd1306_char_f6x8(32, 3, "Game Over");
+            ssd1306_char_f6x8(32, 5, "score:");
+            char temp[10] = {0,0,0,0,0,0,0,0,0,0};
+            itoa(score,temp,10);
+            ssd1306_char_f6x8(70, 5, temp);
+            ssd1306_char_f6x8(32, 6, "top score:");
+            itoa(topScore,temp,10);
+            ssd1306_char_f6x8(90, 6, temp);
+            for (int i = 0; i<1000; i++){
+              beep(1,random(0,i*2));
+            }
+            delay(2000);
+            interrupts();
+            system_sleep();
+            resetGame();
+            noInterrupts(); 
+          }
+        }                      
                       
-                      for (byte row = 0; row <8; row++){
+        for (byte row = 0; row <8; row++){
                         
-                          ssd1306_setpos(obstacle[i],row);
-                          ssd1306_send_data_start();
+          ssd1306_setpos(obstacle[i],row);
+          ssd1306_send_data_start();
                           
-                          if (obstacle[i]>0&&obstacle[i] < 128){
+          if (obstacle[i]>0&&obstacle[i] < 128){
                              
-                             if ((row+1)*8 - gapOffset[i] <= 8){ // generate obstacle : top and transition
-                                byte temp = B11111111>>((row+1)*8 - gapOffset[i]); 
-                                byte tempB = B00000000; 
-                                if (gapBlock[i]>0){tempB=B10101010;}
-                                ssd1306_send_byte(temp);
-                                ssd1306_send_byte(temp|tempB>>1);
-                                ssd1306_send_byte(temp|tempB);
-                                ssd1306_send_byte(temp);
+            if ((row+1)*8 - gapOffset[i] <= 8){ // generate obstacle : top and transition
+              byte temp = B11111111>>((row+1)*8 - gapOffset[i]); 
+              byte tempB = B00000000; 
+              if (gapBlock[i]>0){tempB=B10101010;}
+              ssd1306_send_byte(temp);
+              ssd1306_send_byte(temp|tempB>>1);
+              ssd1306_send_byte(temp|tempB);
+              ssd1306_send_byte(temp);
                                 
-                             }else if (row*8>=gapOffset[i] && (row+1)*8<=gapOffset[i]+gapSize[i]){ // middle gap
-                                byte tempB = B00000000; 
-                                if (gapBlock[i]>0){tempB=B10101010;}
-                                ssd1306_send_byte(B00000000);
-                                ssd1306_send_byte(B00000000|tempB>>1);
-                                ssd1306_send_byte(B00000000|tempB);
-                                ssd1306_send_byte(B00000000);
+            }else if (row*8>=gapOffset[i] && (row+1)*8<=gapOffset[i]+gapSize[i]){ // middle gap
+              byte tempB = B00000000; 
+              if (gapBlock[i]>0){tempB=B10101010;}
+              ssd1306_send_byte(B00000000);
+              ssd1306_send_byte(B00000000|tempB>>1);
+              ssd1306_send_byte(B00000000|tempB);
+              ssd1306_send_byte(B00000000);
 
-                             }else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
-                                //}else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
-                                //byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
+            }else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
+              //}else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
+              //byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
                                 
-                                byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
-                                byte tempB = B00000000; 
-                                if (gapBlock[i]>0){tempB=B10101010;}
-                                ssd1306_send_byte(temp);
-                                ssd1306_send_byte(temp|tempB>>1);
-                                ssd1306_send_byte(temp|tempB);
-                                ssd1306_send_byte(temp);
+              byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
+              byte tempB = B00000000; 
+              if (gapBlock[i]>0){tempB=B10101010;}
+              ssd1306_send_byte(temp);
+              ssd1306_send_byte(temp|tempB>>1);
+              ssd1306_send_byte(temp|tempB);
+              ssd1306_send_byte(temp);
                                 
-                             }else { // fill rest of obstacle
-                                ssd1306_send_byte(B11111111);
-                                ssd1306_send_byte(B11111111);
-                                ssd1306_send_byte(B11111111);
-                                ssd1306_send_byte(B11111111);
-                             }
-                          ssd1306_send_data_stop();
-                          }
-                        }
+            }else { // fill rest of obstacle
+              ssd1306_send_byte(B11111111);
+              ssd1306_send_byte(B11111111);
+              ssd1306_send_byte(B11111111);
+              ssd1306_send_byte(B11111111);
+            }
+            ssd1306_send_data_stop();
+          }
+        }
                    
-                    }
-                  }
+      }
+    }
                   
                  
                  
-                 if (playerOffset%8!=0){ // overflow the player icon into the next screen row if split
-                      ssd1306_setpos(8,playerOffset/8);
-                      ssd1306_send_data_start();
-                        if (stopAnimate==0){
-                            ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
-                            ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
-                            if (fireCount >0){
-                                for (byte f = 0; f<=24; f++){
-                                    ssd1306_send_byte(B00000100<<playerOffset%8);
-                                }
-                                ssd1306_send_byte(B00010101<<playerOffset%8);
-                                ssd1306_send_byte(B00001010<<playerOffset%8);
-                                ssd1306_send_byte(B00010101<<playerOffset%8);
-                                if (fire==1){beep(50,100);}
-                                fire = 0;
+    if (playerOffset%8!=0){ // overflow the player icon into the next screen row if split
+      ssd1306_setpos(8,playerOffset/8);
+      ssd1306_send_data_start();
+      if (stopAnimate==0){
+        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
+        if (fireCount >0){
+          for (byte f = 0; f<=24; f++){
+            ssd1306_send_byte(B00000100<<playerOffset%8);
+          }
+          ssd1306_send_byte(B00010101<<playerOffset%8);
+          ssd1306_send_byte(B00001010<<playerOffset%8);
+          ssd1306_send_byte(B00010101<<playerOffset%8);
+          if (fire==1){beep(50,100);}
+          fire = 0;
                               
-                            }
-                        }else {
-                            ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
-                            ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
-                        }
+        }
+      }else {
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
+      }
                         
-                      ssd1306_send_data_stop();
-                      ssd1306_setpos(8,playerOffset/8+1);
-                      ssd1306_send_data_start();
-                        if (stopAnimate==0){
-                            ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
-                            ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
-                            if (fireCount >0){
-                                for (byte f = 0; f<=24; f++){
-                                    ssd1306_send_byte(B00000100>>8-playerOffset%8);
-                                }
-                                ssd1306_send_byte(B00010101>>8-playerOffset%8);
-                                ssd1306_send_byte(B00001010>>8-playerOffset%8);
-                                ssd1306_send_byte(B00010101>>8-playerOffset%8);
-                                if (fire==1){beep(50,100);}
-                                fire = 0;
+      ssd1306_send_data_stop();
+      ssd1306_setpos(8,playerOffset/8+1);
+      ssd1306_send_data_start();
+      if (stopAnimate==0){
+        ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
+        if (fireCount >0){
+          for (byte f = 0; f<=24; f++){
+            ssd1306_send_byte(B00000100>>8-playerOffset%8);
+          }
+          ssd1306_send_byte(B00010101>>8-playerOffset%8);
+          ssd1306_send_byte(B00001010>>8-playerOffset%8);
+          ssd1306_send_byte(B00010101>>8-playerOffset%8);
+          if (fire==1){beep(50,100);}
+          fire = 0;
                               
-                            }
-                        }else {
-                            ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                            ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-                        }
-                      ssd1306_send_data_stop();
-                      }else {
-                          ssd1306_setpos(8,playerOffset/8);
-                          ssd1306_send_data_start();
-                          if (stopAnimate == 0){
-                            ssd1306_send_byte(B00001100&flameMask[flames]);
-                            ssd1306_send_byte(B01011110&flameMask[flames]);
-                            ssd1306_send_byte(B10010111&flameMask[flames]);
-                            ssd1306_send_byte(B01010011&flameMask[flames]);
-                            ssd1306_send_byte(B01010011&flameMask[flames]);
-                            ssd1306_send_byte(B10010111&flameMask[flames]);
-                            ssd1306_send_byte(B01011110&flameMask[flames]);
-                            ssd1306_send_byte(B00001100&flameMask[flames]);
-                            if (fireCount >0){
-                                for (byte f = 0; f<=24; f++){
-                                    ssd1306_send_byte(B00000100);
-                                }
-                                ssd1306_send_byte(B00010101);
-                                ssd1306_send_byte(B00001010);
-                                ssd1306_send_byte(B00010101);
-                                if (fire==1){beep(50,100);}
-                                fire = 0;
+        }
+      }else {
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+      }
+      ssd1306_send_data_stop();
+    }else {
+      ssd1306_setpos(8,playerOffset/8);
+      ssd1306_send_data_start();
+      if (stopAnimate == 0){
+        ssd1306_send_byte(B00001100&flameMask[flames]);
+        ssd1306_send_byte(B01011110&flameMask[flames]);
+        ssd1306_send_byte(B10010111&flameMask[flames]);
+        ssd1306_send_byte(B01010011&flameMask[flames]);
+        ssd1306_send_byte(B01010011&flameMask[flames]);
+        ssd1306_send_byte(B10010111&flameMask[flames]);
+        ssd1306_send_byte(B01011110&flameMask[flames]);
+        ssd1306_send_byte(B00001100&flameMask[flames]);
+        if (fireCount >0){
+          for (byte f = 0; f<=24; f++){
+            ssd1306_send_byte(B00000100);
+          }
+          ssd1306_send_byte(B00010101);
+          ssd1306_send_byte(B00001010);
+          ssd1306_send_byte(B00010101);
+          if (fire==1){beep(50,100);}
+          fire = 0;
                               
-                            }
-                          }else {
-                            ssd1306_send_byte(B00001100&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B01011110&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B10010111&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B01010011&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B01010011&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B10010111&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B01011110&flameMask[flames] | random(0,255));
-                            ssd1306_send_byte(B00001100&flameMask[flames] | random(0,255)); 
-                          }
-                          ssd1306_send_data_stop();
-                      }
+        }
+      }else {
+        ssd1306_send_byte(B00001100&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B01011110&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B10010111&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B01010011&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B01010011&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B10010111&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B01011110&flameMask[flames] | random(0,255));
+        ssd1306_send_byte(B00001100&flameMask[flames] | random(0,255)); 
+      }
+      ssd1306_send_data_stop();
+    }
                       
-                      // display score
+    // display score
                       
-                      //ssd1306_char_f6x8(32, 8, "score:");
+    //ssd1306_char_f6x8(32, 8, "score:");
                       
-                      char temp[10] = {0,0,0,0,0,0,0,0,0,0};
-                      itoa(score,temp,10);
-                      ssd1306_char_f6x8(92, 0, temp);
+    char temp[10] = {0,0,0,0,0,0,0,0,0,0};
+    itoa(score,temp,10);
+    ssd1306_char_f6x8(92, 0, temp);
                           
                           
-                      flames = 0;
-          	  interrupts();
+    flames = 0;
+    interrupts();
                   
-             //    
+    //    
                      
               
               
               
-              if (stopAnimate == 1){
-                  for (int i = 0; i<1000; i++){
-                    beep(1,random(0,i*2));
-                  }
-                 delay(2000);
-                 system_sleep(); 
-              }
-       }   
+    if (stopAnimate == 1){
+      for (int i = 0; i<1000; i++){
+        beep(1,random(0,i*2));
+      }
+      delay(2000);
+      system_sleep(); 
+    }
+  }   
 }
 void resetGame(){
   ssd1306_char_f6x8(16, 4, "U F O  E S C A P E");
@@ -351,8 +358,31 @@ void resetGame(){
   playerOffset = 0; // y offset of the top of the player
 }
 
-
-
 void beep(int bCount,int bDelay){
-  for (int i = 0; i<=bCount; i++){digitalWrite(1,HIGH);for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}digitalWrite(1,LOW);for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}}
+  for (int i = 0; i<=bCount; i++){
+    digitalWrite(1,HIGH);
+    for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
+    digitalWrite(1,LOW);
+    for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
+  }
+}
+
+// Routines to set and clear bits (used in the sleep code)
+#ifndef cbi
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#endif
+#ifndef sbi
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+#endif
+
+void system_sleep() {
+  ssd1306_fillscreen(0x00);
+  ssd1306_send_command(0xAE);
+  cbi(ADCSRA,ADEN);                    // switch Analog to Digitalconverter OFF
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
+  sleep_enable();
+  sleep_mode();                        // System actually sleeps here
+  sleep_disable();                     // System continues execution here when watchdog timed out 
+  sbi(ADCSRA,ADEN);                    // switch Analog to Digitalconverter ON  
+  ssd1306_send_command(0xAF);
 }

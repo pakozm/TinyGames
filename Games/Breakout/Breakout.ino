@@ -10,10 +10,17 @@
  * 
  * Sleep code is based on this blog post by Matthew Little:
  * http://www.re-innovation.co.uk/web12/index.php/en/blog-75/306-sleep-modes-on-attiny85
-*/
+ *
+ */
+/* 2016
+ *
+ * Updated by pakozm (Paco Zamora Martinez):
+ *
+ *   - code refactoring
+ */
 #include <EEPROM.h>
-#include "font6x8.h"
-#include "ssd1306.h"
+#include <font6x8.h>
+#include <ssd1306.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h> // needed for the additional interrupt
 
@@ -29,8 +36,8 @@ boolean row2[16];
 boolean row3[16];
 int score = 0; // score - counts the number of blocks hit and resets the array above when devisible by 48(total blocks)
 ISR(PCINT0_vect){ // PB0 pin button interrupt			     
-   if (player >0){player--;} 
-   return;
+  if (player >0){player--;} 
+  return;
 }
 
 void playerInc(){ // PB2 pin button interrupt
@@ -48,159 +55,169 @@ void setup() {
 }
 void loop() { 
   delay(40);
-      noInterrupts();
-      ssd1306_init();
-      ssd1306_fillscreen(0x00);
-      ssd1306_char_f6x8(16, 4, "B R E A K O U T");
-      ssd1306_char_f6x8(20, 6, "webboggles.com");
-      beep(200,600);          beep(300,200);          beep(400,300);
-      delay(2000);
-	while (1==1) {
-              // continue moving after the interrupt
-              if (digitalRead(2)==1){if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;}}               if (digitalRead(0)==1){if (player >0){player--;} if (player >0){player--;} if (player >0){player--;}}
-
-              // bounce off the sides of the screen
-              if ((bally+vdir<54&&vdir==1)||(bally-vdir>1&&vdir==-1)){bally+=vdir;}else {vdir = vdir*-1;}
-              if ((ballx+hdir<127&&hdir==1)||(ballx-hdir>1&&hdir==-1)){ballx+=hdir;}else {hdir = hdir*-1;}
-
-              // frame actions
-              if (lastFrame+10<millis()){                 if(bally>10&&bally+vdir>=54&&(ballx<player||ballx>player+platformWidth)){ // game over if the ball misses the platform
-                  int topScore = EEPROM.read(0);
-                  topScore = topScore << 8;                   topScore = topScore |  EEPROM.read(1);                                      if (score>topScore){topScore = score; EEPROM.write(1,topScore & 0xFF); EEPROM.write(0,(topScore>>8) & 0xFF); }
-                  ssd1306_fillscreen(0x00);                
-                  ssd1306_char_f6x8(32, 3, "Game Over");
-                  ssd1306_char_f6x8(32, 5, "score:");
-                  char temp[4] = {0,0,0,0};
-                  itoa(score,temp,10);
-                  ssd1306_char_f6x8(70, 5, temp);
-                  ssd1306_char_f6x8(32, 6, "top score:");
-                  itoa(topScore,temp,10);
-                  ssd1306_char_f6x8(90, 6, temp);
-                  for (int i = 0; i<1000; i++){
-                    beep(1,random(0,i*2));
-                  }
-                  delay(1000);
-                  system_sleep();
-                  resetGame();
-                }else if (ballx<player+platformWidth/2&&bally>10&&bally+vdir>=54){ // if the ball hits left of the platform bounce left
-                  hdir=-1; beep(20,600);
-                }else if (ballx>player+platformWidth/2&&bally>10&&bally+vdir>=54){  // if the ball hits right of the platform bounce right
-                  hdir=1; beep(20,600);
-                }else if (bally+vdir>=54){
-                  hdir=1; beep(20,600);
-                }
-
-                collisionCheck: // go back to here if a collision was detected to prevent flying through a rigid
-                if (floor((bally+vdir)/8)==2){
-                  if (row3[ballx/8]==1){row3[ballx/8]=0; score++;  
-                      collision(); goto collisionCheck; // check collision for the new direction to prevent flying through a rigid
-                  }
-                }else if (floor((bally+vdir)/8)==1){
-                  if (row2[ballx/8]==1){row2[ballx/8]=0; score++; 
-                      collision(); goto collisionCheck;
-                  }
-                }else if (floor((bally+vdir)/8)==0){
-                  if (row1[ballx/8]==1){row1[ballx/8]=0; score++;
-                      collision(); goto collisionCheck;
-                  }
-                }
-
-                // reset blocks if all have been hit
-                if (score%48==0){ 
-                  for (byte i =0; i<16;i++){
-                   row1[i]=1; row2[i]=1; row3[i]=1;
-                  } 
-                }
-              }
-
-              // update whats on the screen
-                  noInterrupts();
-
-                  // blocks
-                  ssd1306_setpos(0,0);
-                  ssd1306_send_data_start();
-                  for (int bl = 0; bl <16; bl++){
-                    if(row1[bl]==1){
-                      sendBlock(1);
-                    }else {
-                      sendBlock(0);
-                    }
-                   }   
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,1);
-                  ssd1306_send_data_start();
-                  for (int bl = 0; bl <16; bl++){
-                    if(row2[bl]==1){
-                      sendBlock(1);
-                    }else {
-                      sendBlock(0);
-                    }
-                   }   
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,2);
-                  ssd1306_send_data_start();
-                  for (int bl = 0; bl <16; bl++){
-                    if(row3[bl]==1){
-                      sendBlock(1);
-                    }else {
-                      sendBlock(0);
-                    }
-                   }   
-                  ssd1306_send_data_stop();
-
-                  // clear area below the blocks
-                  ssd1306_setpos(0,3);
-                  ssd1306_send_data_start();
-                  for (byte i =0; i<128; i++){
-                     ssd1306_send_byte(B00000000);
-                  }
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,4);
-                  ssd1306_send_data_start();
-                  for (byte i =0; i<128; i++){
-                     ssd1306_send_byte(B00000000);
-                  }
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,5);
-                  ssd1306_send_data_start();
-                  for (byte i =0; i<128; i++){
-                     ssd1306_send_byte(B00000000);
-                  }
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,6);
-                  ssd1306_send_data_start();
-                  for (byte i =0; i<128; i++){
-                     ssd1306_send_byte(B00000000);
-                  }
-                  ssd1306_send_data_stop();
-                  ssd1306_setpos(0,7);
-                  ssd1306_send_data_start();
-                  for (byte i =0; i<128; i++){
-                     ssd1306_send_byte(B00000000);
-                  }
-                  ssd1306_send_data_stop();
-
-                  // draw ball
-                  ssd1306_setpos(ballx,bally/8);
-                  uint8_t temp = B00000001;
-                  ssd1306_send_data_start();
-                  temp = temp << bally%8+1;
-                  ssd1306_send_byte(temp);  
-                  ssd1306_send_data_stop();
-
-                  drawPlatform();
-          	  interrupts();
-             //     
-
-	}
-}
-void resetGame(){
+  noInterrupts();
+  ssd1306_init();
+  ssd1306_fillscreen(0x00);
   ssd1306_char_f6x8(16, 4, "B R E A K O U T");
   ssd1306_char_f6x8(20, 6, "webboggles.com");
   beep(200,600);          beep(300,200);          beep(400,300);
   delay(2000);
+  while (1==1) {
+    // continue moving after the interrupt
+    if (digitalRead(2)==1){if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;}}
+    if (digitalRead(0)==1){if (player >0){player--;} if (player >0){player--;} if (player >0){player--;}}
+    
+    // bounce off the sides of the screen
+    if ((bally+vdir<54&&vdir==1)||(bally-vdir>1&&vdir==-1)){bally+=vdir;}else {vdir = vdir*-1;}
+    if ((ballx+hdir<127&&hdir==1)||(ballx-hdir>1&&hdir==-1)){ballx+=hdir;}else {hdir = hdir*-1;}
+
+    // frame actions
+    if (lastFrame+10<millis()){
+      if(bally>10&&bally+vdir>=54&&(ballx<player||ballx>player+platformWidth)){ // game over if the ball misses the platform
+        int topScore = EEPROM.read(0);
+        topScore = topScore << 8;
+        topScore = topScore |  EEPROM.read(1);
+        if (score>topScore){
+          topScore = score;
+          EEPROM.write(1,topScore & 0xFF);
+          EEPROM.write(0,(topScore>>8) & 0xFF);
+        }
+        ssd1306_fillscreen(0x00);                
+        ssd1306_char_f6x8(32, 3, "Game Over");
+        ssd1306_char_f6x8(32, 5, "score:");
+        char temp[4] = {0,0,0,0};
+        itoa(score,temp,10);
+        ssd1306_char_f6x8(70, 5, temp);
+        ssd1306_char_f6x8(32, 6, "top score:");
+        itoa(topScore,temp,10);
+        ssd1306_char_f6x8(90, 6, temp);
+        for (int i = 0; i<1000; i++){
+          beep(1,random(0,i*2));
+        }
+        delay(1000);
+        system_sleep();
+        resetGame();
+      }else if (ballx<player+platformWidth/2&&bally>10&&bally+vdir>=54){ // if the ball hits left of the platform bounce left
+        hdir=-1; beep(20,600);
+      }else if (ballx>player+platformWidth/2&&bally>10&&bally+vdir>=54){  // if the ball hits right of the platform bounce right
+        hdir=1; beep(20,600);
+      }else if (bally+vdir>=54){
+        hdir=1; beep(20,600);
+      }
+
+    collisionCheck: // go back to here if a collision was detected to prevent flying through a rigid
+      if (floor((bally+vdir)/8)==2){
+        if (row3[ballx/8]==1){row3[ballx/8]=0; score++;  
+          collision(); goto collisionCheck; // check collision for the new direction to prevent flying through a rigid
+        }
+      }else if (floor((bally+vdir)/8)==1){
+        if (row2[ballx/8]==1){row2[ballx/8]=0; score++; 
+          collision(); goto collisionCheck;
+        }
+      }else if (floor((bally+vdir)/8)==0){
+        if (row1[ballx/8]==1){row1[ballx/8]=0; score++;
+          collision(); goto collisionCheck;
+        }
+      }
+
+      // reset blocks if all have been hit
+      if (score%48==0){ 
+        for (byte i =0; i<16;i++){
+          row1[i]=1; row2[i]=1; row3[i]=1;
+        } 
+      }
+    }
+
+    // update whats on the screen
+    noInterrupts();
+
+    // blocks
+    ssd1306_setpos(0,0);
+    ssd1306_send_data_start();
+    for (int bl = 0; bl <16; bl++){
+      if(row1[bl]==1){
+        sendBlock(1);
+      }else {
+        sendBlock(0);
+      }
+    }   
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,1);
+    ssd1306_send_data_start();
+    for (int bl = 0; bl <16; bl++){
+      if(row2[bl]==1){
+        sendBlock(1);
+      }else {
+        sendBlock(0);
+      }
+    }   
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,2);
+    ssd1306_send_data_start();
+    for (int bl = 0; bl <16; bl++){
+      if(row3[bl]==1){
+        sendBlock(1);
+      }else {
+        sendBlock(0);
+      }
+    }   
+    ssd1306_send_data_stop();
+
+    // clear area below the blocks
+    ssd1306_setpos(0,3);
+    ssd1306_send_data_start();
+    for (byte i =0; i<128; i++){
+      ssd1306_send_byte(B00000000);
+    }
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,4);
+    ssd1306_send_data_start();
+    for (byte i =0; i<128; i++){
+      ssd1306_send_byte(B00000000);
+    }
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,5);
+    ssd1306_send_data_start();
+    for (byte i =0; i<128; i++){
+      ssd1306_send_byte(B00000000);
+    }
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,6);
+    ssd1306_send_data_start();
+    for (byte i =0; i<128; i++){
+      ssd1306_send_byte(B00000000);
+    }
+    ssd1306_send_data_stop();
+    ssd1306_setpos(0,7);
+    ssd1306_send_data_start();
+    for (byte i =0; i<128; i++){
+      ssd1306_send_byte(B00000000);
+    }
+    ssd1306_send_data_stop();
+
+    // draw ball
+    ssd1306_setpos(ballx,bally/8);
+    uint8_t temp = B00000001;
+    ssd1306_send_data_start();
+    temp = temp << bally%8+1;
+    ssd1306_send_byte(temp);  
+    ssd1306_send_data_stop();
+
+    drawPlatform();
+    interrupts();
+    //     
+
+  }
+}
+void resetGame(){
+  ssd1306_char_f6x8(16, 4, "B R E A K O U T");
+  ssd1306_char_f6x8(20, 6, "webboggles.com / pakozm");
+  beep(200,600);
+  beep(300,200);
+  beep(400,300);
+  delay(2000);
   for (byte i =0; i<16;i++){ // reset blocks
-   row1[i]=1; row2[i]=1; row3[i]=1;
+    row1[i]=1; row2[i]=1; row3[i]=1;
   } 
   platformWidth = 16;
   ballx = 64;
@@ -214,59 +231,64 @@ void resetGame(){
 
 void collision(){ // the collsision check is actually done befor this is called, this code works out where the ball will bounce
   if ((bally+vdir)%8==7&&(ballx+hdir)%8==7){ // bottom right corner
-      if (vdir==1){hdir=1;}else if(vdir==-1&&hdir==1){vdir=1;}else {hdir=1;vdir=1;}
-    }else if ((bally+vdir)%8==7&&(ballx+hdir)%8==0){ // bottom left corner
-      if (vdir==1){hdir=-1;}else if(vdir==-1&&hdir==-1){vdir=1;}else {hdir=-1;vdir=1;}
-    }else if ((bally+vdir)%8==0&&(ballx+hdir)%8==0){ // top left corner
-      if (vdir==-1){hdir=-1;}else if(vdir==1&&hdir==-1){vdir=-1;}else {hdir=-1;vdir=-1;}
-    }else if ((bally+vdir)%8==0&&(ballx+hdir)%8==7){ // top right corner
-      if (vdir==-1){hdir=1;}else if(vdir==1&&hdir==1){vdir=-1;}else {hdir=1;vdir=-1;}
-    }else if ((bally+vdir)%8==7){ // bottom side
-      vdir = 1;
-    }else if ((bally+vdir)%8==0){ // top side
-      vdir = -1;
-    }else if ((ballx+hdir)%8==7){ // right side
-      hdir = 1;
-    }else if ((ballx+hdir)%8==0){ // left side
-      hdir = -1;
-    }else {
-      hdir = hdir*-1; vdir = vdir*-1;
+    if (vdir==1){hdir=1;}else if(vdir==-1&&hdir==1){vdir=1;}else {hdir=1;vdir=1;}
+  }else if ((bally+vdir)%8==7&&(ballx+hdir)%8==0){ // bottom left corner
+    if (vdir==1){hdir=-1;}else if(vdir==-1&&hdir==-1){vdir=1;}else {hdir=-1;vdir=1;}
+  }else if ((bally+vdir)%8==0&&(ballx+hdir)%8==0){ // top left corner
+    if (vdir==-1){hdir=-1;}else if(vdir==1&&hdir==-1){vdir=-1;}else {hdir=-1;vdir=-1;}
+  }else if ((bally+vdir)%8==0&&(ballx+hdir)%8==7){ // top right corner
+    if (vdir==-1){hdir=1;}else if(vdir==1&&hdir==1){vdir=-1;}else {hdir=1;vdir=-1;}
+  }else if ((bally+vdir)%8==7){ // bottom side
+    vdir = 1;
+  }else if ((bally+vdir)%8==0){ // top side
+    vdir = -1;
+  }else if ((ballx+hdir)%8==7){ // right side
+    hdir = 1;
+  }else if ((ballx+hdir)%8==0){ // left side
+    hdir = -1;
+  }else {
+    hdir = hdir*-1; vdir = vdir*-1;
   }
 
   beep(30,300);
 
 }
 void drawPlatform(){
- noInterrupts();
- ssd1306_setpos(player,7);
- ssd1306_send_data_start();
- for (byte pw = 1; pw <platformWidth; pw++){ssd1306_send_byte(B00000011);}                
- ssd1306_send_data_stop();  
- interrupts(); 
+  noInterrupts();
+  ssd1306_setpos(player,7);
+  ssd1306_send_data_start();
+  for (byte pw = 1; pw <platformWidth; pw++){ssd1306_send_byte(B00000011);}                
+  ssd1306_send_data_stop();  
+  interrupts(); 
 }
 void sendBlock(boolean fill){
   if (fill==1){
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B01111110);
-   ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B01111110);
+    ssd1306_send_byte(B00000000);
   }else {
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
-   ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
+    ssd1306_send_byte(B00000000);
   } 
 }
 void beep(int bCount,int bDelay){
-  for (int i = 0; i<=bCount; i++){digitalWrite(1,HIGH);for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}digitalWrite(1,LOW);for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}}
+  for (int i = 0; i<=bCount; i++){
+    digitalWrite(1,HIGH);
+    for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
+    digitalWrite(1,LOW);
+    for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
+  }
 }
 
 // Routines to set and clear bits (used in the sleep code)

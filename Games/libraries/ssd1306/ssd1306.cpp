@@ -1,3 +1,5 @@
+#include "Arduino.h"
+#include "font6x8.h"
 #include "ssd1306.h"
 
 #define DIGITAL_WRITE_HIGH(PORT) PORTB |= (1 << PORT)
@@ -183,24 +185,4 @@ void ssd1306_char_f6x8(uint8_t x, uint8_t y, const char ch[]){
       x += 6;
       j++;
     }
-}
-
-// Routines to set and clear bits (used in the sleep code)
-#ifndef cbi
-#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-#endif
-#ifndef sbi
-#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
-#endif
-
-void system_sleep() {
-  ssd1306_fillscreen(0x00);
-  ssd1306_send_command(0xAE);
-  cbi(ADCSRA,ADEN);                    // switch Analog to Digitalconverter OFF
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
-  sleep_enable();
-  sleep_mode();                        // System actually sleeps here
-  sleep_disable();                     // System continues execution here when watchdog timed out 
-  sbi(ADCSRA,ADEN);                    // switch Analog to Digitalconverter ON  
-  ssd1306_send_command(0xAF);
 }
