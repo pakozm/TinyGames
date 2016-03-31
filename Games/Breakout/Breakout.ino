@@ -1,12 +1,16 @@
 /* 2014
- * Breakout game by Ilya Titov. Find building instructions on http://webboggles.com/
- * The code that does not fall under the licenses of sources listed below can be used non commercially with attribution.
  *
- * If you have problems uploading this sketch, this is probably due to sketch size - you need to update ld.exe in arduino\hardware\tools\avr\avr\bin
+ * Breakout game by Ilya Titov. Find building instructions on
+ * http://webboggles.com/ The code that does not fall under the licenses of
+ * sources listed below can be used non commercially with attribution.
+ *
+ * If you have problems uploading this sketch, this is probably due to sketch
+ * size - you need to update ld.exe in arduino\hardware\tools\avr\avr\bin
  * https://github.com/TCWORLD/ATTinyCore/tree/master/PCREL%20Patch%20for%20GCC
  *
- * This sketch is using the screen control and font functions written by Neven Boyanov for the http://tinusaur.wordpress.com/ project
- * Source code and font files available at: https://bitbucket.org/tinusaur/ssd1306xled
+ * This sketch is using the screen control and font functions written by Neven
+ * Boyanov for the http://tinusaur.wordpress.com/ project Source code and font
+ * files available at: https://bitbucket.org/tinusaur/ssd1306xled
  * 
  * Sleep code is based on this blog post by Matthew Little:
  * http://www.re-innovation.co.uk/web12/index.php/en/blog-75/306-sleep-modes-on-attiny85
@@ -17,12 +21,27 @@
  * Updated by pakozm (Paco Zamora Martinez):
  *
  *   - code refactoring
+ *
+ *   Attiny85 PINS
+ *             ____
+ *   RESET   -|_|  |- 5V
+ *   SCL (3) -|    |- (2) RIGHT
+ *   SDA (4) -|    |- (1) BUZZER
+ *   GND     -|____|- (0) LEFT
+ */
  */
 #include <EEPROM.h>
 #include <font6x8.h>
 #include <ssd1306.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h> // needed for the additional interrupt
+
+template<typename T> T min(const T &a, const T &b) {
+  return (a<b) ? a : b;
+}
+template<typename T> T max(const T &a, const T &b) {
+  return (a>b) ? a : b;
+}
 
 volatile byte player = 0; //0 to 128-platformWidth  - this is the position of the bounce platform
 byte platformWidth = 16; 
@@ -34,7 +53,11 @@ long lastFrame = 0; // time since the screen was updated last
 boolean row1[16]; // on-off array of blocks
 boolean row2[16];
 boolean row3[16];
-int score = 0; // score - counts the number of blocks hit and resets the array above when devisible by 48(total blocks)
+int score = 0; // score - counts the number of blocks hit and resets the array
+               // above when devisible by 48 (total blocks)
+const int LEFT_BTN  = 0;
+const int BUZZER    = 1;
+const int RIGHT_BTN = 2;
 ISR(PCINT0_vect){ // PB0 pin button interrupt			     
   if (player >0){player--;} 
   return;
@@ -60,20 +83,47 @@ void loop() {
   ssd1306_fillscreen(0x00);
   ssd1306_char_f6x8(16, 4, "B R E A K O U T");
   ssd1306_char_f6x8(20, 6, "webboggles.com");
-  beep(200,600);          beep(300,200);          beep(400,300);
+  beep(200,600);
+  beep(300,200);
+  beep(400,300);
   delay(2000);
   while (1==1) {
     // continue moving after the interrupt
-    if (digitalRead(2)==1){if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;} if (player <128-platformWidth){player++;}}
-    if (digitalRead(0)==1){if (player >0){player--;} if (player >0){player--;} if (player >0){player--;}}
+    if (digitalRead(RIGHT_BTN)==1) {
+      player = min(128-platformWidth, player+3);
+      /*
+        if (player < 128-platformWidth) { player++; }
+        if (player < 128-platformWidth) { player++; }
+        if (player < 128-platformWidth) { player++; }
+      */
+    }
+    if (digitalRead(LEFT_BTN)==1) {
+      player = max(0, player-3);
+      /*
+        if (player > 0) { player--; }
+        if (player > 0) { player--; }
+        if (player > 0) { player--; }
+      */
+    }
     
     // bounce off the sides of the screen
-    if ((bally+vdir<54&&vdir==1)||(bally-vdir>1&&vdir==-1)){bally+=vdir;}else {vdir = vdir*-1;}
-    if ((ballx+hdir<127&&hdir==1)||(ballx-hdir>1&&hdir==-1)){ballx+=hdir;}else {hdir = hdir*-1;}
+    if ((bally+vdir<54 && vdir==1) || (bally-vdir>1 && vdir==-1)) {
+      bally+=vdir;
+    }
+    else {
+      vdir = vdir*-1;
+    }
+    if ((ballx+hdir<127 && hdir==1) || (ballx-hdir>1 && hdir==-1)) {
+      ballx+=hdir;
+    }
+    else {
+      hdir = hdir*-1;
+    }
 
     // frame actions
-    if (lastFrame+10<millis()){
-      if(bally>10&&bally+vdir>=54&&(ballx<player||ballx>player+platformWidth)){ // game over if the ball misses the platform
+    if (lastFrame+10 < millis()) {
+      if(bally>10 && bally+vdir>=54 && (ballx<player || ballx>player+platformWidth)) {
+        // game over if the ball misses the platform
         int topScore = EEPROM.read(0);
         topScore = topScore << 8;
         topScore = topScore |  EEPROM.read(1);
@@ -97,26 +147,41 @@ void loop() {
         delay(1000);
         system_sleep();
         resetGame();
-      }else if (ballx<player+platformWidth/2&&bally>10&&bally+vdir>=54){ // if the ball hits left of the platform bounce left
-        hdir=-1; beep(20,600);
-      }else if (ballx>player+platformWidth/2&&bally>10&&bally+vdir>=54){  // if the ball hits right of the platform bounce right
-        hdir=1; beep(20,600);
+      }else if (ballx<player+platformWidth/2 && bally>10 && bally+vdir>=54) {
+        // if the ball hits left of the platform bounce left
+        hdir=-1;
+        beep(20,600);
+      }else if (ballx>player+platformWidth/2 && bally>10 && bally+vdir>=54) {
+        // if the ball hits right of the platform bounce right
+        hdir=1;
+        beep(20,600);
       }else if (bally+vdir>=54){
-        hdir=1; beep(20,600);
+        hdir=1;
+        beep(20,600);
       }
 
     collisionCheck: // go back to here if a collision was detected to prevent flying through a rigid
-      if (floor((bally+vdir)/8)==2){
-        if (row3[ballx/8]==1){row3[ballx/8]=0; score++;  
-          collision(); goto collisionCheck; // check collision for the new direction to prevent flying through a rigid
+      if (floor((bally+vdir)/8) == 2){
+        if (row3[ballx/8]==1) {
+          row3[ballx/8]=0;
+          score++;
+          collision();
+          // check collision for the new direction to prevent flying through a rigid
+          goto collisionCheck;
         }
-      }else if (floor((bally+vdir)/8)==1){
-        if (row2[ballx/8]==1){row2[ballx/8]=0; score++; 
-          collision(); goto collisionCheck;
+      }else if (floor((bally+vdir)/8) == 1){
+        if (row2[ballx/8]==1) {
+          row2[ballx/8]=0;
+          score++; 
+          collision();
+          goto collisionCheck;
         }
-      }else if (floor((bally+vdir)/8)==0){
-        if (row1[ballx/8]==1){row1[ballx/8]=0; score++;
-          collision(); goto collisionCheck;
+      }else if (floor((bally+vdir)/8) == 0){
+        if (row1[ballx/8]==1) {
+          row1[ballx/8]=0;
+          score++;
+          collision();
+          goto collisionCheck;
         }
       }
 
@@ -229,7 +294,9 @@ void resetGame(){
   ballx = player+platformWidth/2;
 }
 
-void collision(){ // the collsision check is actually done befor this is called, this code works out where the ball will bounce
+// the collsision check is actually done before this is called, this code works
+// out where the ball will bounce
+void collision(){
   if ((bally+vdir)%8==7&&(ballx+hdir)%8==7){ // bottom right corner
     if (vdir==1){hdir=1;}else if(vdir==-1&&hdir==1){vdir=1;}else {hdir=1;vdir=1;}
   }else if ((bally+vdir)%8==7&&(ballx+hdir)%8==0){ // bottom left corner
@@ -284,9 +351,9 @@ void sendBlock(boolean fill){
 }
 void beep(int bCount,int bDelay){
   for (int i = 0; i<=bCount; i++){
-    digitalWrite(1,HIGH);
+    digitalWrite(BUZZER,HIGH);
     for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
-    digitalWrite(1,LOW);
+    digitalWrite(BUZZER,LOW);
     for(int i2=0; i2<bDelay; i2++){__asm__("nop\n\t");}
   }
 }
