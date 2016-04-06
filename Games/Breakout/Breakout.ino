@@ -24,12 +24,12 @@
  *
  *   Attiny85 PINS
  *             ____
- *   RESET   -|_|  |- 5V
+ *   RESET   -|_|  |- 3V
  *   SCL (3) -|    |- (2) RIGHT
  *   SDA (4) -|    |- (1) BUZZER
  *   GND     -|____|- (0) LEFT
  */
-#include <EEPROM.h>
+#include <avr/eeprom.h>
 #include <font6x8.h>
 #include <ssd1306.h>
 #include <avr/sleep.h>
@@ -37,6 +37,8 @@
 
 #define min(a,b) ((a)<(b)) ? (a) : (b)
 #define max(a,b) ((a)>(b)) ? (a) : (b)
+
+uint16_t *EEPROM_ADDR = (uint16_t*)0;
 
 const int LEFT_BTN  = 0;
 const int BUZZER    = 1;
@@ -65,7 +67,7 @@ int vdir = -1; // vertical direction and step  distance
 int hdir = -1; // horizontal direction and step distance
 long lastFrame = 0; // time since the screen was updated last
 boolean rows[BLOCK_NUM_ROWS][BLOCKS_PER_ROW]; // on-off array of blocks
-int score = 0; // score - counts the number of blocks hit and resets the array
+uint16_t score = 0; // score - counts the number of blocks hit and resets the array
                // above when devisible by TOTAL_BLOCKS
 
 ISR(PCINT0_vect){ // PB0 pin button interrupt
@@ -78,53 +80,52 @@ void playerInc(){ // PB2 pin button interrupt
 }
 
 void setup() {
-  resetGame();
   DDRB = 0b00000010;  	// set PB1 as output (for the speaker)
   PCMSK = 0b00000001;	// pin change mask: listen to portb bit 1
   GIMSK |= 0b00100000;	// enable PCINT interrupt
   sei();		// enable all interrupts
   attachInterrupt(0,playerInc,CHANGE);
-  lastFrame = millis();
-
-  delay(40);
-  ssd1306_init();
+  
   resetGame();
 }
 
 void loop() {
-  // continue moving after the interrupt
-  platformStep();
-
-  // bounce off the sides of the screen
-  ballStep();
-
-  // frame actions
+  // frame actions and screen update
   if (lastFrame+10 < millis()) {
+    // continue moving after the interrupt
+    platformStep();
+    
+    // bounce off the sides of the screen
+    ballStep();
+
+    // frame actions
     frameStep();
+
+    // update whats on the screen
+    noInterrupts();
+    drawBlocks();
+    clearAreaBelowBlocks();
+    drawBall();
+    drawPlatform();
+    interrupts();
   }
-
-  // update whats on the screen
-  noInterrupts();
-
-  drawBlocks();
-  clearAreaBelowBlocks();
-  drawBall();
-  drawPlatform();
-
-  interrupts();
-  //
 }
 
 void resetGame(){
+  lastFrame = millis();
+  delay(40);
   noInterrupts();
+  ssd1306_init();
   ssd1306_fillscreen(0x00);
-  ssd1306_char_f6x8(16, 4, "B R E A K O U T");
-  ssd1306_char_f6x8(20, 6, "webboggles.com / pakozm");
+  ssd1306_char_f6x8(16, 2, "B R E A K O U T");
+  ssd1306_char_f6x8(20, 4, "webboggles.com");
   ssd1306_char_f6x8(24, 6, "pakozm  (2016)");
   beep(200,600);
   beep(300,200);
   beep(400,300);
+  interrupts();
   delay(2000);
+  noInterrupts();
   resetBlocks();
   platformWidth = INITIAL_PLATFORM_WIDTH;
   ballx = BALL_INITIAL_X;
@@ -273,22 +274,23 @@ void frameStep() {
     if(bally>10 &&
        (ballx<player || ballx>player+platformWidth)) {
       // game over if the ball misses the platform
-      int topScore = EEPROM.read(0);
-      topScore = topScore << 8;
-      topScore = topScore |  EEPROM.read(1);
+      uint16_t topScore = eeprom_read_word(EEPROM_ADDR);
+      if (topScore == 0xFFFF) {
+        eeprom_write_word(EEPROM_ADDR, 0);
+        topScore = 0;
+      }
       if (score>topScore){
         topScore = score;
-        EEPROM.write(1,topScore & 0xFF);
-        EEPROM.write(0,(topScore>>8) & 0xFF);
+        eeprom_write_word(EEPROM_ADDR, topScore);
       }
       ssd1306_fillscreen(0x00);
       ssd1306_char_f6x8(32, 3, "Game Over");
       ssd1306_char_f6x8(32, 5, "score:");
-      char temp[4] = {0,0,0,0};
-      itoa(score,temp,10);
+      char temp[6] = {0,0,0,0,0,0};
+      utoa(score,temp,10);
       ssd1306_char_f6x8(70, 5, temp);
       ssd1306_char_f6x8(32, 6, "top score:");
-      itoa(topScore,temp,10);
+      utoa(topScore,temp,10);
       ssd1306_char_f6x8(90, 6, temp);
       for (int i = 0; i<1000; i++){
         beep(1,random(0,i*2));
