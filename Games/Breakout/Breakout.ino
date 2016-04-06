@@ -119,7 +119,7 @@ void resetGame(){
   ssd1306_fillscreen(0x00);
   ssd1306_char_f6x8(16, 2, "B R E A K O U T");
   ssd1306_char_f6x8(20, 4, "webboggles.com");
-  ssd1306_char_f6x8(24, 6, "pakozm  (2016)");
+  ssd1306_char_f6x8(26, 6, "pakozm  2016");
   beep(200,600);
   beep(300,200);
   beep(400,300);
@@ -285,11 +285,11 @@ void frameStep() {
       }
       ssd1306_fillscreen(0x00);
       ssd1306_char_f6x8(32, 3, "Game Over");
-      ssd1306_char_f6x8(32, 5, "score:");
+      ssd1306_char_f6x8(32, 5, "score ");
       char temp[6] = {0,0,0,0,0,0};
       utoa(score,temp,10);
       ssd1306_char_f6x8(70, 5, temp);
-      ssd1306_char_f6x8(32, 6, "top score:");
+      ssd1306_char_f6x8(32, 6, "top score ");
       utoa(topScore,temp,10);
       ssd1306_char_f6x8(90, 6, temp);
       for (int i = 0; i<1000; i++){
