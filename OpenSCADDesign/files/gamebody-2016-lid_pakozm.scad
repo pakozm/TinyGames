@@ -6,13 +6,16 @@ union() {
 
   difference() {
     object1(1);
+    // remove joint
     translate([-31,48,1]){
       cube([8,8,20]);
     }
+    // reset
     translate([-27,52,-10]){
       cylinder(20,r=1,$fn=200);
     }
-    translate([-27,56,-10]){
+    // power
+    translate([-29,56,-10]){
       cube([4,10,30]);
     }
     
@@ -39,18 +42,19 @@ union() {
     
   }
   translate([-32,54.5,1]) {
+    // new joint
     cylinder(2,r=0.6,$fn=200);
     translate([3,-2,-1.3]) {
       mirror([0,1,0]) {
         linear_extrude(height=0.3, convexity=4)
           text("Reset", size=1.5, halign="right",
                 font="Liberation Sans");
-        translate([1,-7,0]) {
+        translate([-1,-7,0]) {
           linear_extrude(height=0.3, convexity=4)          
             text("Off", size=1.5, halign="right",
                   font="Liberation Sans");
         }
-        translate([1,-12,0]) {
+        translate([-1,-12,0]) {
           linear_extrude(height=0.3, convexity=4)
             text("On", size=1.5, halign="right",
                   font="Liberation Sans");
