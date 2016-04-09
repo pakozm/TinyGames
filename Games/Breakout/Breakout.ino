@@ -108,6 +108,9 @@ void loop() {
     drawBall();
     drawPlatform();
     interrupts();
+
+    lastFrame = millis();
+    
   }
 }
 

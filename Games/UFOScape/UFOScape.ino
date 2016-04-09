@@ -16,6 +16,13 @@
  * Updated by pakozm (Paco Zamora Martinez):
  *
  *   - code refactoring
+ *
+ *   Attiny85 PINS
+ *             ____
+ *   RESET   -|_|  |- 3V
+ *   SCL (3) -|    |- (2) RIGHT
+ *   SDA (4) -|    |- (1) BUZZER
+ *   GND     -|____|- (0) LEFT
  */
 #include <EEPROM.h>
 #include <font6x8.h>
@@ -23,6 +30,15 @@
 #include <avr/sleep.h>
 #include <avr/interrupt.h> // needed for the additional interrupt
 
+uint16_t *EEPROM_ADDR = (uint16_t*)0;
+
+const int LEFT_BTN  = 0;
+const int BUZZER    = 1;
+const int RIGHT_BTN = 2;
+
+const int SCREEN_WIDTH   = 128;
+const int SCREEN_HEIGHT  = 64;
+const int NUM_ROWS       = 8;
 
 boolean stopAnimate = 0; // this is set to 1 when a collision is detected
 int maxObstacles = 1; // this defines the max number of in game obstacles
@@ -97,7 +113,7 @@ void loop() {
       }}
     stepsSinceLastObstacle += obstacleStep;
     for (byte i = 0; i<maxObstacles;i++){ // fly obstacles
-      if (obstacle[i] >= 0 && obstacle[i] <= 128 && stopAnimate==0){
+      if (obstacle[i] >= 0 && obstacle[i] <= SCREEN_WIDTH && stopAnimate==0){
         obstacle[i] -= obstacleStep;
         if (gapBlock[i]>0 && obstacle[i] < 36  && playerOffset>gapOffset[i] && playerOffset+5<gapOffset[i]+gapSize[i] && fireCount > 0){//
           gapBlock[i] = 0;
@@ -111,7 +127,7 @@ void loop() {
       if (obstacle[i]<=4 && stepsSinceLastObstacle>=random(30,100)){ // generate new obstacles
         obstacle[i] = 123;
         gapSize[i] = random(25,maxGap);
-        gapOffset[i] = random(0,64-gapSize[i]);
+        gapOffset[i] = random(0,SCREEN_HEIGHT-gapSize[i]);
         if (random(0,blockChance)==0){gapBlock[i] = 1;}else {gapBlock[i] = 0;}
         stepsSinceLastObstacle = 0;
         score+=1;
@@ -129,7 +145,7 @@ void loop() {
     noInterrupts();
     // Send Obstacle
     for (byte i = 0; i<maxObstacles;i++){
-      if (obstacle[i] >= -5 && obstacle[i] <= 128){ // only deal with visible obstacles
+      if (obstacle[i] >= -5 && obstacle[i] <= SCREEN_WIDTH){ // only deal with visible obstacles
         if (obstacle[i] > 8 && obstacle[i] <16){ // look for collision if obstacle is near the player
           if (playerOffset < gapOffset[i] || playerOffset+5 > gapOffset[i]+gapSize[i] || gapBlock[i] != 0){
             // collision!
@@ -158,15 +174,15 @@ void loop() {
           }
         }                      
                       
-        for (byte row = 0; row <8; row++){
+        for (byte row = 0; row <NUM_ROWS; row++){
                         
           ssd1306_setpos(obstacle[i],row);
           ssd1306_send_data_start();
                           
-          if (obstacle[i]>0&&obstacle[i] < 128){
+          if (obstacle[i]>0&&obstacle[i] < SCREEN_WIDTH){
                              
-            if ((row+1)*8 - gapOffset[i] <= 8){ // generate obstacle : top and transition
-              byte temp = B11111111>>((row+1)*8 - gapOffset[i]); 
+            if ((row+1)*NUM_ROWS - gapOffset[i] <= NUM_ROWS){ // generate obstacle : top and transition
+              byte temp = B11111111>>((row+1)*NUM_ROWS - gapOffset[i]); 
               byte tempB = B00000000; 
               if (gapBlock[i]>0){tempB=B10101010;}
               ssd1306_send_byte(temp);
@@ -174,7 +190,7 @@ void loop() {
               ssd1306_send_byte(temp|tempB);
               ssd1306_send_byte(temp);
                                 
-            }else if (row*8>=gapOffset[i] && (row+1)*8<=gapOffset[i]+gapSize[i]){ // middle gap
+            }else if (row*NUM_ROWS>=gapOffset[i] && (row+1)*NUM_ROWS<=gapOffset[i]+gapSize[i]){ // middle gap
               byte tempB = B00000000; 
               if (gapBlock[i]>0){tempB=B10101010;}
               ssd1306_send_byte(B00000000);
@@ -182,11 +198,11 @@ void loop() {
               ssd1306_send_byte(B00000000|tempB);
               ssd1306_send_byte(B00000000);
 
-            }else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
-              //}else if ((gapOffset[i] +gapSize[i]) >= row*8 && (gapOffset[i] +gapSize[i]) <= (row+1)*8){ // bottom transition
-              //byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
+            }else if ((gapOffset[i] +gapSize[i]) >= row*NUM_ROWS && (gapOffset[i] +gapSize[i]) <= (row+1)*NUM_ROWS){ // bottom transition
+              //}else if ((gapOffset[i] +gapSize[i]) >= row*NUM_ROWS && (gapOffset[i] +gapSize[i]) <= (row+1)*NUM_ROWS){ // bottom transition
+              //byte temp = B11111111<<((gapOffset[i] + gapSize[i])%NUM_ROWS); 
                                 
-              byte temp = B11111111<<((gapOffset[i] + gapSize[i])%8); 
+              byte temp = B11111111<<((gapOffset[i] + gapSize[i])%NUM_ROWS); 
               byte tempB = B00000000; 
               if (gapBlock[i]>0){tempB=B10101010;}
               ssd1306_send_byte(temp);
@@ -209,76 +225,76 @@ void loop() {
                   
                  
                  
-    if (playerOffset%8!=0){ // overflow the player icon into the next screen row if split
-      ssd1306_setpos(8,playerOffset/8);
+    if (playerOffset%NUM_ROWS!=0){ // overflow the player icon into the next screen row if split
+      ssd1306_setpos(NUM_ROWS,playerOffset/NUM_ROWS);
       ssd1306_send_data_start();
       if (stopAnimate==0){
-        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%8);
-        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames])<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B00001100&flameMask[flames])<<playerOffset%NUM_ROWS);
         if (fireCount >0){
           for (byte f = 0; f<=24; f++){
-            ssd1306_send_byte(B00000100<<playerOffset%8);
+            ssd1306_send_byte(B00000100<<playerOffset%NUM_ROWS);
           }
-          ssd1306_send_byte(B00010101<<playerOffset%8);
-          ssd1306_send_byte(B00001010<<playerOffset%8);
-          ssd1306_send_byte(B00010101<<playerOffset%8);
+          ssd1306_send_byte(B00010101<<playerOffset%NUM_ROWS);
+          ssd1306_send_byte(B00001010<<playerOffset%NUM_ROWS);
+          ssd1306_send_byte(B00010101<<playerOffset%NUM_ROWS);
           if (fire==1){beep(50,100);}
           fire = 0;
                               
         }
       }else {
-        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%8);
-        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))<<playerOffset%NUM_ROWS);
       }
                         
       ssd1306_send_data_stop();
-      ssd1306_setpos(8,playerOffset/8+1);
+      ssd1306_setpos(NUM_ROWS,playerOffset/NUM_ROWS+1);
       ssd1306_send_data_start();
       if (stopAnimate==0){
-        ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames])>>8-playerOffset%8);
-        ssd1306_send_byte((B00001100&flameMask[flames])>>8-playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B00001100&flameMask[flames])>>NUM_ROWS-playerOffset%NUM_ROWS);
         if (fireCount >0){
           for (byte f = 0; f<=24; f++){
-            ssd1306_send_byte(B00000100>>8-playerOffset%8);
+            ssd1306_send_byte(B00000100>>NUM_ROWS-playerOffset%NUM_ROWS);
           }
-          ssd1306_send_byte(B00010101>>8-playerOffset%8);
-          ssd1306_send_byte(B00001010>>8-playerOffset%8);
-          ssd1306_send_byte(B00010101>>8-playerOffset%8);
+          ssd1306_send_byte(B00010101>>NUM_ROWS-playerOffset%NUM_ROWS);
+          ssd1306_send_byte(B00001010>>NUM_ROWS-playerOffset%NUM_ROWS);
+          ssd1306_send_byte(B00010101>>NUM_ROWS-playerOffset%NUM_ROWS);
           if (fire==1){beep(50,100);}
           fire = 0;
                               
         }
       }else {
-        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>8-playerOffset%8);
-        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>8-playerOffset%8);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01010011&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B10010111&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B01011110&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
+        ssd1306_send_byte((B00001100&flameMask[flames] | random(0,255))>>NUM_ROWS-playerOffset%NUM_ROWS);
       }
       ssd1306_send_data_stop();
     }else {
-      ssd1306_setpos(8,playerOffset/8);
+      ssd1306_setpos(NUM_ROWS,playerOffset/NUM_ROWS);
       ssd1306_send_data_start();
       if (stopAnimate == 0){
         ssd1306_send_byte(B00001100&flameMask[flames]);
