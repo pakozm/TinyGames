@@ -9,9 +9,8 @@ public:
   virtual bool getBit(int p) const = 0;
 };
 
-
 template<int N>
-class ByteArrayInProgMem {
+class ByteArrayInProgMem : public ByteArray {
 public:
   ByteArrayInProgMem(PROGMEM const byte * const data) : data(data) {
     bits_len = N<<3;

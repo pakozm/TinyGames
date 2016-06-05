@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include "sprites.h"
 
+DummySprite SpriteInScreen::dummy;
+
 PROGMEM const byte ProgMemArrays::boat[18] = {
   B00001100,
   B00000000,
